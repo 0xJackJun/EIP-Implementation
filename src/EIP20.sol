@@ -85,9 +85,9 @@ abstract contract ERC20 {
     }
 
     function _burn(address _from, uint256 _value) internal virtual {
-        balanceOf[from] -= amount;
+        balanceOf[_from] -= _value;
         unchecked {
-            totalSupply -= amount;
+            totalSupply -= _value;
         }
         emit Transfer(_from, address(0), _value);
     }
