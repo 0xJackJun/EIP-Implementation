@@ -43,10 +43,8 @@ abstract contract ERC20 {
                             ERC20 INTERFACE
     //////////////////////////////////////////////////////////////*/
 
-    function transfer(address _to, uint256 _value) external returns (bool success) {
-        if (balanceOf[msg.sender] < _value) {
-            revert InsufficientBalance();
-        }
+    function transfer(address _to, uint256 _value) public virtual returns (bool success) {
+        if (balanceOf[msg.sender] < _value) revert InsufficientBalance();
         unchecked {
             balanceOf[msg.sender] -= _value;
             balanceOf[_to] += _value;
@@ -55,18 +53,16 @@ abstract contract ERC20 {
         return true;
     }
 
-    function approve(address _spender, uint256 _value) external returns (bool success) {
+    function approve(address _spender, uint256 _value) public virtual returns (bool success) {
         allowance[msg.sender][_spender] += _value;
         emit Approval(msg.sender, _spender, _value);
         return true;
     }
 
-    function transferFrom(address _from, address _to, uint256 _value) external returns (bool success) {
+    function transferFrom(address _from, address _to, uint256 _value) public virtual returns (bool success) {
         if (allowance[_from][_to] < _value) revert InsufficientAllowance();
+        if (balanceOf[_from] < _value) revert InsufficientBalance();
 
-        if (balanceOf[_to] < _value) {
-            revert InsufficientBalance();
-        }
         unchecked {
             allowance[_from][_to] -= _value;
             balanceOf[_from] -= _value;
