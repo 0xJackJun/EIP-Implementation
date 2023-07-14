@@ -10,6 +10,10 @@ abstract contract ERC721TokenReceiver {
 }
 
 abstract contract ERC721 {
+    /*//////////////////////////////////////////////////////////////
+                            STORAGE
+    //////////////////////////////////////////////////////////////*/
+
     string public name;
     string public symbol;
     mapping(address => uint256) public balanceOf;
@@ -17,21 +21,32 @@ abstract contract ERC721 {
     mapping(uint256 => address) public getApproved;
     mapping(address => mapping(address => bool)) public isApprovedForAll;
 
-    error NotAuthorized();
-    error InvalidFrom();
-    error InvalidRecipient();
+    /*//////////////////////////////////////////////////////////////
+                            EVENT
+    //////////////////////////////////////////////////////////////*/
 
     event Transfer(address indexed _from, address indexed _to, uint256 indexed _tokenId);
     event Approval(address indexed _owner, address indexed _approved, uint256 indexed _tokenId);
     event ApprovalForAll(address indexed _owner, address indexed _operator, bool _approved);
+
+    /*//////////////////////////////////////////////////////////////
+                            CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
 
     constructor(string memory name_, string memory symbol_) {
         name = name_;
         symbol = symbol_;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            ERC721 INTERFACE
+    //////////////////////////////////////////////////////////////*/
+
+    function tokenURI(uint256 tokenID) public view virtual returns (string memory);
+
     function approve(address _approved, uint256 _tokenId) public payable virtual {
-        if (ownerOf[_tokenId] != msg.sender || isApprovedForAll[msg.sender][_approved] != true) revert NotAuthorized();
+        address owner = ownerOf[_tokenId];
+        require(owner == msg.sender || isApprovedForAll[owner][msg.sender] == true, "NotAuthorized");
         getApproved[_tokenId] = _approved;
         emit Approval(msg.sender, _approved, _tokenId);
     }
@@ -42,13 +57,14 @@ abstract contract ERC721 {
     }
 
     function transferFrom(address _from, address _to, uint256 _tokenId) public payable virtual {
-        if (ownerOf[_tokenId] != _from) revert InvalidFrom();
-        if (_to == address(0)) revert InvalidRecipient();
-        if (_from != msg.sender && getApproved[_tokenId] != msg.sender && !isApprovedForAll[_from][msg.sender]) {
-            revert NotAuthorized();
-        }
-        balanceOf[_from] -= 1;
-        balanceOf[_to] += 1;
+        require(ownerOf[_tokenId] == _from, "InvalidFrom");
+        require(_to != address(0), "InvalidRecipient");
+        require(
+            _from == msg.sender || getApproved[_tokenId] == msg.sender || isApprovedForAll[_from][msg.sender],
+            "NotAuthorized"
+        );
+        balanceOf[_from]--;
+        balanceOf[_to]++;
         ownerOf[_tokenId] = _to;
         delete getApproved[_tokenId];
         emit Transfer(_from, _to, _tokenId);
@@ -59,12 +75,10 @@ abstract contract ERC721 {
             _to.code.length == 0
                 || ERC721TokenReceiver(_to).onERC721Received(msg.sender, _from, _tokenId, "")
                     == ERC721TokenReceiver.onERC721Received.selector,
-            "Unsafe_Recipient"
+            "UNSAFE_RECIPIENT"
         );
         transferFrom(_from, _to, _tokenId);
     }
-
-    function tokenURI(uint256 tokenID) public view virtual returns (string memory);
 
     function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes calldata data)
         external
@@ -75,10 +89,14 @@ abstract contract ERC721 {
             _to.code.length == 0
                 || ERC721TokenReceiver(_to).onERC721Received(msg.sender, _from, _tokenId, data)
                     == ERC721TokenReceiver.onERC721Received.selector,
-            "Unsafe_Recipient"
+            "UNSAFE_RECIPIENT"
         );
         transferFrom(_from, _to, _tokenId);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     function _safeMint(address _to, uint256 _tokenId) internal virtual {
         require(
@@ -102,19 +120,23 @@ abstract contract ERC721 {
 
     function _mint(address to, uint256 id) internal virtual {
         require(to != address(0), "Invalid_Recipient");
+        require(ownerOf[id] == address(0), "Already Minted");
         ownerOf[id] = to;
         balanceOf[to]++;
         emit Transfer(address(0), to, id);
     }
 
     function _burn(address from, uint256 id) internal virtual {
-        require(ownerOf[id] == from, "NotAuthorized");
+        require(ownerOf[id] == from || getApproved[id] == msg.sender || isApprovedForAll[from][msg.sender] == true, "NotAuthorized");
         delete ownerOf[id];
         balanceOf[from]--;
         delete getApproved[id];
         emit Transfer(from, address(0), id);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            EIP165 FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
         return interfaceId == 0x01ffc9a7 //ERC165
             || interfaceId == 0x80ac58cd //ERC721
