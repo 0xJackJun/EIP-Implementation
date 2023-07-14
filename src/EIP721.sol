@@ -79,4 +79,45 @@ abstract contract ERC721 {
         );
         transferFrom(_from, _to, _tokenId);
     }
+
+    function _safeMint(address _to, uint256 _tokenId) internal virtual {
+        require(
+            _to.code.length == 0
+                || ERC721TokenReceiver(_to).onERC721Received(msg.sender, address(0), _tokenId, "")
+                    == ERC721TokenReceiver.onERC721Received.selector,
+            "UNSAFE_RECIPIENT"
+        );
+        _mint(_to, _tokenId);
+    }
+
+    function _safeMint(address _to, uint256 _tokenId, bytes calldata data) internal virtual {
+        require(
+            _to.code.length == 0
+                || ERC721TokenReceiver(_to).onERC721Received(msg.sender, address(0), _tokenId, data)
+                    == ERC721TokenReceiver.onERC721Received.selector,
+            "UNSAFE_RECIPIENT"
+        );
+        _mint(_to, _tokenId);
+    }
+
+    function _mint(address to, uint256 id) internal virtual {
+        require(to != address(0), "Invalid_Recipient");
+        ownerOf[id] = to;
+        balanceOf[to]++;
+        emit Transfer(address(0), to, id);
+    }
+
+    function _burn(address from, uint256 id) internal virtual {
+        require(ownerOf[id] == from, "NotAuthorized");
+        delete ownerOf[id];
+        balanceOf[from]--;
+        delete getApproved[id];
+        emit Transfer(from, address(0), id);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
+        return interfaceId == 0x01ffc9a7 //ERC165
+            || interfaceId == 0x80ac58cd //ERC721
+            || interfaceId == 0x5b5e139f; //ERC721Metadata
+    }
 }
