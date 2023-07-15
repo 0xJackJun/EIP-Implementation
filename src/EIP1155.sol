@@ -94,18 +94,49 @@ abstract contract ERC1155 {
         emit ApprovalForAll(msg.sender, _operator, _approved);
     }
 
-    function _mint(address to, uint256 id, uint256 amount, bytes memory data) internal virtual;
+    function _mint(address to, uint256 id, uint256 amount, bytes memory data) internal virtual {
+        require(
+            to != address(0) || to.code.length == 0
+                || ERC1155TokenReceiver(to).onERC1155Received(msg.sender, address(0), id, amount, data)
+                    == ERC1155TokenReceiver.onERC1155Received.selector,
+            "UnsafeRecipient"
+        );
+        balanceOf[to][id] += amount;
+        emit TransferSingle(msg.sender, address(0), to, id, amount);
+    }
 
     function _mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
         internal
-        virtual;
-
-    function _burn(address from, uint256 id, uint256 amount) internal virtual;
-
-    function _burnBatch(address from, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
-        internal
         virtual
-    {}
+    {
+        require(ids.length == amounts.length, "InlvalidIdsOrAmounts");
+        require(
+            to != address(0) || to.code.length == 0
+                || ERC1155TokenReceiver(to).onERC1155BatchReceived(msg.sender, address(0), ids, amounts, data)
+                    == ERC1155TokenReceiver.onERC1155Received.selector,
+            "UnsafeRecipient"
+        );
+        for (uint256 i = 0; i < ids.length; i++) {
+            balanceOf[to][ids[i]] += amounts[i];
+        }
+    }
+
+    function _burn(address from, uint256 id, uint256 amount) internal virtual {
+        require(balanceOf[from][id] >= amount, "InsufficientBalance");
+        require(from == msg.sender || isApprovalForAll[from][msg.sender], "InvalidAuthority");
+        unchecked {
+            balanceOf[from][id] -= amount;
+        }
+        emit TransferSingle(msg.sender, from, address(0), id, amount);
+    }
+
+    function _burnBatch(address from, uint256[] memory ids, uint256[] memory amounts) internal virtual {
+        require(ids.length == amounts.length, "InlvalidIdsOrAmounts");
+        for (uint256 i = 0; i < ids.length; i++) {
+            balanceOf[from][ids[i]] -= amounts[i];
+        }
+        emit TransferBatch(msg.sender, from, address(0), ids, amounts);
+    }
 
     function supportInterface(bytes4 interfaceId) public view virtual returns (bool) {
         return interfaceId == 0x01ffc9a7 //ERC165
